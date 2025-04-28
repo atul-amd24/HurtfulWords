@@ -7,9 +7,9 @@
 set -e
 source activate hurtfulwords
 
-BASE_DIR="/h/haoran/projects/HurtfulWords"
-OUTPUT_DIR="/h/haoran/projects/HurtfulWords/data/"
-SCIBERT_DIR="/scratch/gobi1/haoran/shared_data/BERT_DeBias/models/SciBERT"
+BASE_DIR="/Users/aravind/Premnisha/MS/dlh/HurtfulWords/"
+OUTPUT_DIR="/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/"
+SCIBERT_DIR="/Users/aravind/.cache/huggingface/hub/models--allenai--scibert_scivocab_uncased/snapshots/24f92d32b1bfb0bcaf9ab193ff3ad01e87732fc1"
 mkdir -p "$OUTPUT_DIR/models/"
 
 cd "$BASE_DIR/scripts" 

@@ -1,9 +1,10 @@
 #!/h/haoran/anaconda3/bin/python
 import pandas as pd
 import numpy as np
-from pytorch_pretrained_bert.tokenization import BertTokenizer
+from transformers import BertTokenizer
 import random
 import argparse
+import ast
 
 parser = argparse.ArgumentParser('''Sentences from the sentence tokenizer can be very short. This script packs together several sentences into sequences
                                  to ensure that tokenA and tokenB have some minimum length (guaranteed except for sentences at the end of a document) when training BERT''')
@@ -15,9 +16,16 @@ parser.add_argument('-m','--minlen', help = 'minimum lengths of tokens to pack t
                      type=int,  dest='minlen', default = [20])
 args = parser.parse_args()
 
-tokenizer = BertTokenizer.from_pretrained(args.model_path, do_lower_case = True)
+# tokenizer = BertTokenizer.from_pretrained(args.model_path, do_lower_case = True)
+tokenizer = BertTokenizer.from_pretrained(args.model_path)
 
 df = pd.read_pickle(args.input_loc)
+
+print(df.head())
+print(f"Shape: {df.shape}")
+# df = pd.read_csv(args.input_loc)
+# df['sent_toks_lens'] = df['sent_toks_lens'].apply(ast.literal_eval)
+# df['sents'] = df['sents'].apply(ast.literal_eval)
 
 def pack_sentences(row, minlen):
     i, cumsum, init = 0,0,0
@@ -46,3 +54,4 @@ for i in args.minlen:
 	assert(all(df['BERT_sents_lens'+str(i)].apply(sum) == df['sent_toks_lens'].apply(sum)))
 
 df.to_pickle(args.output_loc)
+print(f"✅ Processing complete. Saved to:{args.output_loc} and leng of df: {len(df)}")

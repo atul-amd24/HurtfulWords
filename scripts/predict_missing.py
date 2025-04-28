@@ -8,7 +8,9 @@ import random
 # CONFIGURATIONS
 ###########################
 
-SCIBERT_DIR = Path('/scratch/hdd001/home/haoran/shared_data/scibert_scivocab_uncased/')
+SCIBERT_DIR="/Users/aravind/.cache/huggingface/hub/models--allenai--scibert_scivocab_uncased/snapshots/24f92d32b1bfb0bcaf9ab193ff3ad01e87732fc1"
+
+# SCIBERT_DIR = Path('/scratch/hdd001/home/haoran/shared_data/scibert_scivocab_uncased/')
 
 RACE_LIST = ['caucasian', 'hispanic', 'african', 'african american', 'white']
 ###########################

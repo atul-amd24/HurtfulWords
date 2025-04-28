@@ -23,37 +23,82 @@ InputFeatures = namedtuple("InputFeatures", "input_ids input_mask segment_ids lm
 
 log_format = '%(asctime)-10s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=log_format)
+from transformers import BertTokenizer
+import numpy as np
 
+# Initialize the tokenizer
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
-def convert_example_to_features(example, tokenizer, max_seq_length):
+def convert_example_to_features(example, tokenizer, seq_len):
     tokens = example["tokens"]
     segment_ids = example["segment_ids"]
     is_random_next = example["is_random_next"]
     masked_lm_positions = example["masked_lm_positions"]
     masked_lm_labels = example["masked_lm_labels"]
 
-    assert len(tokens) == len(segment_ids) <= max_seq_length  # The preprocessed data should be already truncated
-    input_ids = tokenizer.convert_tokens_to_ids(tokens)
+    input_ids = []
+    for token in tokens:
+        # Check if token exists in vocab
+        if token in tokenizer.vocab:
+            input_ids.append(tokenizer.convert_tokens_to_ids(token))
+        else:
+            # If not found, append [UNK] token's id
+            input_ids.append(tokenizer.convert_tokens_to_ids("[UNK]"))
+            # print(f"Token '{token}' not found in vocab, replaced with [UNK]")
+
     masked_label_ids = tokenizer.convert_tokens_to_ids(masked_lm_labels)
 
-    input_array = np.zeros(max_seq_length, dtype=np.int)
+    # Fill input arrays
+    input_array = np.zeros(seq_len, dtype=np.int32)
     input_array[:len(input_ids)] = input_ids
 
-    mask_array = np.zeros(max_seq_length, dtype=np.bool)
+    mask_array = np.zeros(seq_len, dtype=bool)
     mask_array[:len(input_ids)] = 1
 
-    segment_array = np.zeros(max_seq_length, dtype=np.bool)
+    segment_array = np.zeros(seq_len, dtype=bool)
     segment_array[:len(segment_ids)] = segment_ids
 
-    lm_label_array = np.full(max_seq_length, dtype=np.int, fill_value=-1)
+    lm_label_array = np.full(seq_len, dtype=np.int32, fill_value=-1)
     lm_label_array[masked_lm_positions] = masked_label_ids
 
+    # Returning features
     features = InputFeatures(input_ids=input_array,
                              input_mask=mask_array,
                              segment_ids=segment_array,
                              lm_label_ids=lm_label_array,
                              is_next=is_random_next)
     return features
+
+
+# def convert_example_to_features(example, tokenizer, max_seq_length):
+#     tokens = example["tokens"]
+#     segment_ids = example["segment_ids"]
+#     is_random_next = example["is_random_next"]
+#     masked_lm_positions = example["masked_lm_positions"]
+#     masked_lm_labels = example["masked_lm_labels"]
+
+#     assert len(tokens) == len(segment_ids) <= max_seq_length  # The preprocessed data should be already truncated
+#     input_ids = tokenizer.convert_tokens_to_ids(tokens)
+#     masked_label_ids = tokenizer.convert_tokens_to_ids(masked_lm_labels)
+
+#     input_array = np.zeros(max_seq_length, dtype=np.int)
+#     input_array[:len(input_ids)] = input_ids
+
+#     mask_array = np.zeros(max_seq_length, dtype=np.bool)
+#     mask_array[:len(input_ids)] = 1
+
+#     segment_array = np.zeros(max_seq_length, dtype=np.bool)
+#     segment_array[:len(segment_ids)] = segment_ids
+
+#     lm_label_array = np.full(max_seq_length, dtype=np.int, fill_value=-1)
+#     lm_label_array[masked_lm_positions] = masked_label_ids
+
+#     features = InputFeatures(input_ids=input_array,
+#                              input_mask=mask_array,
+#                              segment_ids=segment_array,
+#                              lm_label_ids=lm_label_array,
+#                              is_next=is_random_next)
+#     return features
 
 
 class PregeneratedDataset(Dataset):

@@ -1,11 +1,11 @@
 set -e 
 source activate hurtfulwords
 
-BASE_DIR="/h/haoran/projects/HurtfulWords/" 
-OUTPUT_DIR="/h/haoran/projects/HurtfulWords/data/"
-#MODEL_NAME="baseline_clinical_BERT_1_epoch_512"
+BASE_DIR="/Users/aravind/Premnisha/MS/dlh/HurtfulWords"
+OUTPUT_DIR="${BASE_DIR}/data"
+MODEL_NAME="baseline_clinical_BERT_1_epoch_512"
 #MODEL_NAME="adv_clinical_BERT_1_epoch_512" 
-MODEL_NAME="SciBERT"
+# MODEL_NAME="SciBERT"
 
 cd "$BASE_DIR/scripts"
 

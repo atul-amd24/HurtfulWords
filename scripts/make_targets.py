@@ -1,4 +1,3 @@
-# code is a mess since it's mostly exported from a jupyter notebook
 import os
 import pandas as pd
 import Constants
@@ -30,16 +29,24 @@ def preprocessing(row):
     return seqs
 
 df = pd.read_pickle(args.processed_df.resolve())
+print(f"len of df: {len(df)}")
+print(f"cols of df: {df.columns}")
+# df.rename(columns={
+#     'row_id_x': 'row_id',
+#     'row_id_y': 'note_id'
+# }, inplace=True)
+
 df['seqs'] = df.apply(preprocessing, axis = 1)
 df['num_seqs'] = df.seqs.apply(len)
 assert(df.seqs.apply(lambda x: any([len(i)== 0 for i in x])).sum() == 0)
 
 df['note_id'] = df['note_id'].astype(str)
-df = df[~pd.isnull(df['oasis'])]
+# df = df[~pd.isnull(df['oasis'])]
 MAX_AGG_SEQUENCE_LENGTH = Constants.MAX_AGG_SEQUENCE_LEN
 
 root_folder = args.mimic_benchmark_dir/'root/'
-other_features = ['age', 'oasis', 'oasis_prob', 'sofa', 'sapsii', 'sapsii_prob']
+# other_features = ['age', 'oasis', 'oasis_prob', 'sofa', 'sapsii', 'sapsii_prob']
+other_features = ['age']
 
 '''
 In-Hospital Mortality
@@ -68,7 +75,6 @@ subject ID and episode number
 train_reader = InHospitalMortalityReader(dataset_dir=args.mimic_benchmark_dir/'in-hospital-mortality' / 'train')
 test_reader = InHospitalMortalityReader(dataset_dir=args.mimic_benchmark_dir/'in-hospital-mortality' / 'test')
 all_stays = pd.read_csv(os.path.join(root_folder, 'all_stays.csv'), parse_dates = ['INTIME']).set_index('ICUSTAY_ID')
-
 def read_patient(name, period_length, allowed_types, eps = 0.001, dtype = 'train', return_intime = False):
     # given a file name, retrieve all notes from t=-eps to period_length+eps
     subj_id = int(name.split('_')[0])
@@ -77,15 +83,65 @@ def read_patient(name, period_length, allowed_types, eps = 0.001, dtype = 'train
     row = stay.iloc[0]
 
     icuid = row['Icustay']
-    hadm_id = all_stays.loc[icuid]['HADM_ID']
-    intime = all_stays.loc[icuid]['INTIME']
-    result = df[(df['subject_id'] == subj_id) & (df['hadm_id'] == hadm_id)
-       & (df['charttime'] >= intime) & (df['charttime'] < intime+pd.Timedelta(hours = period_length + eps))
-             & (df['category'].isin(allowed_types))]
-    if return_intime:
-        return (intime, result)
-    else:
-        return result
+    try:
+        hadm_id = all_stays.loc[icuid]['HADM_ID']
+        intime = all_stays.loc[icuid]['INTIME']
+        df['charttime'] = pd.to_datetime(df['charttime'], errors='coerce')
+
+        result = df[(df['subject_id'] == subj_id) & (df['hadm_id'] == hadm_id)
+        & (df['charttime'] >= intime) & (df['charttime'] < intime+pd.Timedelta(hours = period_length + eps))
+                & (df['category'].isin(allowed_types))]
+        if return_intime:
+            return (intime, result)
+        else:
+            return result
+    except KeyError:
+        print(f"⚠️ Skipping missing icustay_id: {icuid}")
+        if return_intime:
+            return [],[]
+        else:
+            return []
+# def read_patient(name, period_length, allowed_types, eps = 0.001, dtype = 'train', return_intime = False):
+#     # given a file name, retrieve all notes from t=-eps to period_length+eps
+#     subj_id = int(name.split('_')[0])
+#     stay = pd.read_csv(os.path.join(root_folder, dtype, str(subj_id), name.split('_')[1]+'.csv'))
+#     # print(f"Stay: {stay}")
+#     assert(stay.shape[0] == 1)
+#     row = stay.iloc[0]
+
+#     icuid = row['Icustay']
+    
+#     try:
+#         # print(f"ALL STAYS: {all_stays.loc[icuid]}")
+#         hadm_id = all_stays.loc[icuid]['HADM_ID']
+#         # hadm_present = hadm_id in df['hadm_id'].values
+#         # sub_present = subj_id in df['subject_id'].values
+#         # unique_subjects_df = df['subject_id'].nunique()
+#         # unique_subjects_all_stays = all_stays['SUBJECT_ID'].nunique()
+#         # print(f"Unique subject_id count in all_stays: {unique_subjects_all_stays}")
+
+#         # # 4. Common subjects between df and all_stays
+#         # common_subjects = set(df['subject_id'].unique()) & set(all_stays['SUBJECT_ID'].unique())
+#         # print(f"Common subject count: {len(common_subjects)}")
+
+#         # common_hadm = set(df['hadm_id'].unique()) & set(all_stays['HADM_ID'].unique())
+#         # print(f"Common hadm count: {len(common_hadm)}")
+
+#         # print(f"📄 Read patient: subj_id={subj_id} found {sub_present}, name={name}, ICU_ID={icuid}, HADM_ID={hadm_id} → Found in df: {hadm_present}")
+#         intime = all_stays.loc[icuid]['INTIME']
+#         df['charttime'] = pd.to_datetime(df['charttime'], errors='coerce')
+#         intime = pd.to_datetime(intime)
+
+#         result = df[(df['subject_id'] == subj_id) & (df['hadm_id'] == hadm_id)
+#         & (df['charttime'] >= intime) & (df['charttime'] < intime+pd.Timedelta(hours = period_length + eps))
+#                 & (df['category'].isin(allowed_types))]
+#         if return_intime:
+#             return (intime, result)
+#         else:
+#             return result
+#     except KeyError:
+#         print(f"⚠️ Skipping missing icustay_id: {icuid}")
+#         return []  # or [] or {} or whatever fits your downstream logic
 
 def agg_notes(notes, first = False, intime = None, timeDiff = pd.Timedelta(hours = 48)):
     notes = notes.sort_values(by = 'charttime', ascending = False)
@@ -129,7 +185,7 @@ for i in range(train_reader.get_number_of_examples()):
         dic['note_id'] = ''.join(ex['name'].split('_')[:2]) + 'a'
         dic['fold'] = 'train'
         temp.append(dic)
-
+print(f"TRAIN : Len of temp: {len(temp)}")
 for i in range(test_reader.get_number_of_examples()):
     ex = test_reader.read_example(i)
     notes = read_patient(ex['name'], 48, ['Nursing', 'Physician ', 'Nursing/other'], dtype = 'test')
@@ -140,14 +196,15 @@ for i in range(test_reader.get_number_of_examples()):
         dic['fold'] = 'test'
         temp.append(dic)
 t2 = pd.DataFrame(temp)
+print(f"TEST : Len of temp: {len(temp)}")
+
 # split training set into folds, stratify by inhosp_mort
 subjects = t2.loc[t2['fold'] != 'test',['subject_id', 'inhosp_mort']].groupby('subject_id').first().reset_index()
-kf = KFold(n_splits = 10, shuffle = True, random_state = 42)
+kf = KFold(n_splits = 2, shuffle = True, random_state = 42)
 for c,j in enumerate(kf.split(subjects, groups = subjects['inhosp_mort'])):
     for k in j[1]:
         t2.loc[t2['subject_id'] == subjects.loc[k]['subject_id'], 'fold'] = str(c+1)
-t2.to_pickle(args.output_dir / 'inhosp_mort')
-
+t2.to_pickle(args.output_dir / 'inhosp_mort.pkl')
 
 '''
 Phenotyping using all patient notes
@@ -209,12 +266,12 @@ for i in range(test_reader.get_number_of_examples()):
 cols = target_names + ['any_chronic', 'any_acute', 'any_disease']
 t3 = pd.DataFrame(temp)
 subjects = t3.loc[t3['fold'] != 'test',['subject_id', 'any_disease']].groupby('subject_id').first().reset_index()
-kf = KFold(n_splits = 10, shuffle = True, random_state = 42)
+kf = KFold(n_splits = 3, shuffle = True, random_state = 42)
 for c,j in enumerate(kf.split(subjects, groups = subjects['any_disease'])):
     for k in j[1]:
         t3.loc[t3['subject_id'] == subjects.loc[k]['subject_id'], 'fold'] = str(c+1)
 
-t3.to_pickle(args.output_dir / 'phenotype_all')
+t3.to_pickle(args.output_dir / 'phenotype_all.pkl')
 
 '''
 Phenotyping using the first patient note
@@ -234,6 +291,7 @@ test_reader = PhenotypingReader(dataset_dir=args.mimic_benchmark_dir/'phenotypin
 temp = []
 for i in range(train_reader.get_number_of_examples()):
     ex = train_reader.read_example(i)
+    print(ex['name'], ex['t'])
     intime, notes = read_patient(ex['name'], float(ex['t']), ['Nursing', 'Physician ', 'Nursing/other'], return_intime = True)
     if len(notes) > 0:
         dic = agg_notes(notes, first = True, intime = intime)
@@ -274,4 +332,4 @@ kf = KFold(n_splits = 10, shuffle = True, random_state = 42)
 for c,j in enumerate(kf.split(subjects, groups = subjects['any_disease'])):
     for k in j[1]:
         t4.loc[t4['subject_id'] == subjects.loc[k]['subject_id'], 'fold'] = str(c+1)
-t4.to_pickle(args.output_dir / 'phenotype_first')
+t4.to_pickle(args.output_dir / 'phenotype_first.pkl')

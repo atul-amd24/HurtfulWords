@@ -1,141 +1,174 @@
 import pandas as pd
-import numpy as np
-import psycopg2
-import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
-import Constants
-import sys
 from pathlib import Path
 
-output_folder = Path(sys.argv[1])
-output_folder.mkdir(parents = True, exist_ok = True)
+# Set input and output paths
+data_dir = Path("/Users/aravind/Premnisha/MS/dlh/sampled")
+output_folder = Path("/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data")
+output_folder.mkdir(parents=True, exist_ok=True)
 
-conn = psycopg2.connect('dbname=mimic user=haoran host=mimic password=password')
+# Load CSVs
+pats = pd.read_csv(data_dir / "PATIENTS.csv", parse_dates=["DOB", "DOD"])
+adm = pd.read_csv(data_dir / "ADMISSIONS.csv", parse_dates=["ADMITTIME", "DEATHTIME", "DISCHTIME"])
+notes = pd.read_csv(data_dir / "NOTEEVENTS.csv", parse_dates=["CHARTDATE", "CHARTTIME"])
+diag = pd.read_csv(data_dir / "DIAGNOSES_ICD.csv")
+icustays = pd.read_csv(data_dir / "ICUSTAYS.csv", parse_dates=["INTIME", "OUTTIME"])
+icustays.columns = icustays.columns.str.lower()
+icustays = icustays.set_index(['subject_id', 'hadm_id'])
 
-pats = pd.read_sql_query('''
-select subject_id, gender, dob, dod from mimiciii.patients
-''', conn)
+print("✅ Patients:", len(pats))
+print("✅ Admissions:", len(adm))
+print("✅ Notes:", len(notes))
+print("✅ Diagnoses:", len(diag))
+print("✅ Columns on Patients table:", pats.columns)
+print("✅ Columns on Admissions table:", adm.columns)
+print("✅ Columns on notes table:", notes.columns)
+print("✅ Columns on Diagnoses table:", diag.columns)
 
+
+# Step 1: KFold assignment to patients
 n_splits = 12
-pats = pats.sample(frac = 1, random_state = 42).reset_index(drop = True)
-kf = KFold(n_splits = n_splits, shuffle = True, random_state = 42)
-for c,i in enumerate(kf.split(pats, groups = pats.gender)):
+pats = pats.sample(frac=1, random_state=42).reset_index(drop=True)
+kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+for c, i in enumerate(kf.split(pats, groups=pats.GENDER)):
     pats.loc[i[1], 'fold'] = str(c)
 
-adm = pd.read_sql_query('''
-select subject_id, hadm_id, insurance, language,
-religion, ethnicity,
-admittime, deathtime, dischtime,
-HOSPITAL_EXPIRE_FLAG, DISCHARGE_LOCATION,
-diagnosis as adm_diag
-from mimiciii.admissions
-''', conn)
+# Step 2: Merge admissions with patients
+df = pd.merge(pats, adm.rename(columns={"DIAGNOSIS": "adm_diag"}), on="SUBJECT_ID", how="inner")
 
-df = pd.merge(pats, adm, on='subject_id', how = 'inner')
+# print("✅ After patients+admissions merge:", df.shape)
+# print("✅ Columns before merging notes:", df.columns)
 
-def merge_death(row):
-    if not(pd.isnull(row.deathtime)):
-        return row.deathtime
+# Step 3: Merge death information
+df['DOD_MERGED'] = df.apply(lambda row: row['DEATHTIME'] if pd.notnull(row['DEATHTIME']) else row['DOD'], axis=1)
+
+print("✅ DOB non-null before notes merge:", df['DOB'].notna().sum())
+
+# Step 4: Process notes
+# print(f"Before merge with notes {notes['TEXT'].head(10)}")
+# print(f"notes sum: {notes['TEXT'].isna().sum()}")
+# print(f"notes empty: {(notes['TEXT'] == '').sum()}")
+
+notes = notes[~notes['HADM_ID'].isnull()]
+df_notes = notes
+
+df['HADM_ID'] = df['HADM_ID'].astype(str).str.split('.').str[0]
+df_notes['HADM_ID'] = df_notes['HADM_ID'].astype(str).str.split('.').str[0]
+df_notes.rename(columns={'ROW_ID': 'NOTE_ID'}, inplace=True)
+
+# print(df['HADM_ID'].unique()[:5])
+# print(df_notes['HADM_ID'].unique()[:5])
+
+df = pd.merge(df,df_notes, on='HADM_ID', how='left')
+
+df_check = df[['CHARTDATE', 'DOB']].dropna()
+
+# print("Rows with merged TEXT:", df['TEXT'].notna().sum())
+# print("Total rows in df:", len(df))
+# print(df['HADM_ID'].dtype)
+# print(df_notes['HADM_ID'].dtype)
+
+# df_test = pd.merge(df, df_notes[['HADM_ID', 'TEXT']], on='HADM_ID', how='inner')
+# print(df_test['TEXT'].head())
+print(f"After merge with notes {df_check.head(10)}")
+print("✅ DOB non-null after notes merge:", df['DOB'].notna().sum())
+print("✅ After notes merge:", df.shape)
+# pd.set_option('display.max_colwidth', None)
+# print("✅ notes table:", df_notes['TEXT'].head(1))
+# print("✅ DF table:", df['TEXT'].head(1))
+
+# print("✅ Columns after merging notes:", df.columns)
+
+# Step 5: Fill missing ethnicity
+df['ETHNICITY'].fillna('UNKNOWN/NOT SPECIFIED', inplace=True)
+
+def clean_ethnicity(val):
+    mappings = {
+        'HISPANIC OR LATINO': 'HISPANIC/LATINO',
+        'BLACK/AFRICAN AMERICAN': 'BLACK',
+        'UNABLE TO OBTAIN': 'UNKNOWN/NOT SPECIFIED',
+        'PATIENT DECLINED TO ANSWER': 'UNKNOWN/NOT SPECIFIED'
+    }
+    bases = ['WHITE', 'UNKNOWN/NOT SPECIFIED', 'BLACK', 'HISPANIC/LATINO', 'OTHER', 'ASIAN']
+    if val in bases:
+        return val
+    elif val in mappings:
+        return mappings[val]
     else:
-        return row.dod
-df['dod_merged'] = df.apply(merge_death, axis = 1)
-
-
-notes = pd.read_sql_query('''
-select category, chartdate, charttime, hadm_id, row_id as note_id, text from mimiciii.noteevents
-where iserror is null
-''', conn)
-
-# drop all outpatients. They only have a subject_id, so can't link back to insurance or other fields
-notes = notes[~(pd.isnull(notes['hadm_id']))]
-
-df = pd.merge(left = notes, right = df, on='hadm_id', how = 'left')
-
-df.ethnicity.fillna(value = 'UNKNOWN/NOT SPECIFIED', inplace = True)
-
-others_set = set()
-def cleanField(string):
-    mappings = {'HISPANIC OR LATINO': 'HISPANIC/LATINO',
-                'BLACK/AFRICAN AMERICAN': 'BLACK',
-                'UNABLE TO OBTAIN':'UNKNOWN/NOT SPECIFIED',
-               'PATIENT DECLINED TO ANSWER': 'UNKNOWN/NOT SPECIFIED'}
-    bases = ['WHITE', 'UNKNOWN/NOT SPECIFIED', 'BLACK', 'HISPANIC/LATINO',
-            'OTHER', 'ASIAN']
-
-    if string in bases:
-        return string
-    elif string in mappings:
-        return mappings[string]
-    else:
-        for i in bases:
-            if i in string:
-                return i
-        others_set.add(string)
+        for b in bases:
+            if b in str(val):
+                return b
         return 'OTHER'
 
-df['ethnicity_to_use'] = df['ethnicity'].apply(cleanField)
+df['ETHNICITY_TO_USE'] = df['ETHNICITY'].apply(clean_ethnicity)
 
-df = df[df.chartdate >= df.dob]
+print("→ Missing CHARTDATE:", df['CHARTDATE'].isna().sum())
+print("→ Missing DOB:", df['DOB'].isna().sum())
+# Step: Fill missing CHARTDATE using DOB
+df['CHARTDATE'] = df.apply(
+    lambda row: row['CHARTDATE'] if pd.notnull(row['CHARTDATE']) else row.get('DOB', pd.NaT),
+    axis=1
+)
 
-ages = []
-for i in range(df.shape[0]):
-    ages.append((df.chartdate.iloc[i] - df.dob.iloc[i]).days/365.24)
-df['age'] = ages
+# print("✅ Missing CHARTDATE after fallback fill:", df['CHARTDATE'].isna().sum())
 
-df.loc[(df.category == 'Discharge summary') |
-       (df.category == 'Echo') |
-       (df.category == 'ECG'), 'fold'] = 'NA'
+# df_check = df[['CHARTDATE', 'DOB']].dropna()
+# print(df_check.head(10))
+# Step 6: Convert date fields
+df['CHARTDATE'] = pd.to_datetime(df['CHARTDATE'], errors='coerce')
+df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce')
+df['DOD'] = pd.to_datetime(df['DOD'], errors='coerce')
 
-icds = (pd.read_sql_query('select * from mimiciii.diagnoses_icd', conn)
-        .groupby('hadm_id')
-        .agg({'icd9_code': lambda x: list(x.values)})
-        .reset_index())
+print("✅ BEFORE filtering CHARTDATE >= DOB:", df.shape)
 
-df = pd.merge(left = df, right = icds, on = 'hadm_id')
+# Step 7b: Filter out invalid or extreme dates before calculating age
+df = df[(df['CHARTDATE'] >= df['DOB'])]
+df = df[(df['CHARTDATE'].dt.year < 2200) & (df['DOB'].dt.year > 2000)]
 
-def map_lang(x):
-    if x == 'ENGL':
-        return 'English'
-    if pd.isnull(x):
-        return 'Missing'
-    return 'Other'
-df['language_to_use'] = df['language'].apply(map_lang)
+# df = df[(df['CHARTDATE'] >= df['DOB']) & (df['CHARTDATE'] < pd.Timestamp('2160-01-01'))]
+print("✅ After filtering CHARTDATE >= DOB:", df.shape)
 
+# Step 8: Calculate age
+df['AGE'] = (df['CHARTDATE'] - df['DOB']).dt.days / 365.24
 
-for i in Constants.groups:
-    assert(i['name'] in df.columns), i['name']
+# Step 9: Mark certain categories as fold='NA'
+df.loc[df['CATEGORY'].isin(['Discharge summary', 'Echo', 'ECG']), 'fold'] = 'NA'
 
-acuities = pd.read_sql_query('''
-select * from (
-select a.subject_id, a.hadm_id, a.icustay_id, a.oasis, a.oasis_prob, b.sofa from
-(mimiciii.oasis a
-natural join mimiciii.sofa b )) ab
-natural join
-(select subject_id, hadm_id, icustay_id, sapsii, sapsii_prob from
-mimiciii.sapsii) c
-''', conn)
+# Step 10: Merge diagnoses
+diag = diag.groupby('HADM_ID').agg({'ICD9_CODE': lambda x: list(x)}).reset_index()
+diag['HADM_ID'] = diag['HADM_ID'].astype(str)
+df = pd.merge(df, diag, on='HADM_ID', how='left')
 
-icustays = pd.read_sql_query('''
-select subject_id, hadm_id, icustay_id, intime, outtime
-from mimiciii.icustays
-''', conn).set_index(['subject_id','hadm_id'])
+# Step 11: Map language field
+df['LANGUAGE_TO_USE'] = df['LANGUAGE'].apply(lambda x: 'English' if x == 'ENGL' else ('Missing' if pd.isnull(x) else 'Other'))
 
+# Step 12: Fill ICU stay ID
 def fill_icustay(row):
-    opts = icustays.loc[[row['subject_id'],row['hadm_id']]]
-    if pd.isnull(row['charttime']):
-        charttime = row['chartdate'] + pd.Timedelta(days = 2)
-    else:
-        charttime = row['charttime']
-    stay = opts[(opts['intime'] <= charttime)].sort_values(by = 'intime', ascending = True)
-
-    if len(stay) == 0:
+    try:
+        opts = icustays.xs((row['SUBJECT_ID'], row['HADM_ID']), drop_level=False)
+    except KeyError:
         return None
-        #print(row['subject_id'], row['hadm_id'], row['category'])
-    return stay.iloc[-1]['icustay_id']
 
-df['icustay_id'] = df[df.category.isin(['Discharge summary','Physician ','Nursing','Nursing/other'])].apply(fill_icustay, axis = 1)
+    charttime = row['CHARTTIME'] if pd.notnull(row['CHARTTIME']) else row['CHARTDATE'] + pd.Timedelta(days=2)
+    stay = opts[opts['intime'] <= charttime].sort_values(by='intime', ascending=True)
+    return stay.iloc[-1]['icustay_id'] if not stay.empty else None
 
-df = pd.merge(df, acuities.drop(columns = ['subject_id','hadm_id']), on = 'icustay_id', how = 'left')
-df.loc[df.age >= 90, 'age'] = 91.4
+df['icustay_id'] = df[df['CATEGORY'].isin(['Discharge summary', 'Physician', 'Nursing', 'Nursing/other'])].apply(fill_icustay, axis=1)
 
-df.to_pickle(output_folder / "df_raw.pkl")
+# Step 13: Cap ages above 90
+df.loc[df['AGE'] >= 90, 'AGE'] = 91.4
+print("✅ Final dataframe shape before saving:", df.shape)
+
+df.columns = df.columns.str.lower()  # lowercase columns before checking
+df.rename(columns={
+    'row_id_x': 'row_id',
+    'subject_id_x': 'subject_id'
+}, inplace=True)
+print("✅ Columns:", df.columns)
+
+# df.to_pickle(output_folder / "df_raw-full.pkl")
+# print("✅ Processing complete. Saved to:", output_folder / "df_raw-full.pkl")
+
+# Step 14: Save as csv
+df.to_csv(output_folder / "df_raw-full.csv", index=False)
+print("✅ Processing complete. Saved to:", output_folder / "df_raw-full.csv")

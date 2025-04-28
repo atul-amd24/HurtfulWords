@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils import data
 import pickle
-from pytorch_pretrained_bert import BertTokenizer, BertModel
+from transformers import BertTokenizer, BertModel
 from run_classifier_dataset_utils import InputExample, convert_examples_to_features
 from pathlib import Path
 from tqdm import tqdm
@@ -70,6 +70,8 @@ tokenizer = BertTokenizer.from_pretrained(args.model_path)
 model = BertModel.from_pretrained(args.model_path)
 
 target = args.target_col_name
+print(f"Colums: {df.columns}")
+print(f"TARGET: {target}")
 assert(target in df.columns)
 
 #even if no adversary, must have valid protected group column for code to work
@@ -87,6 +89,11 @@ other_fields_to_include = args.other_fields
 if args.freeze_bert:
     for param in model.parameters():
         param.requires_grad = False
+
+print("Folds available in df:", df['fold'].unique())
+print("Fold distribution:\n", df['fold'].value_counts())
+df['fold'] = df['fold'].replace('2', 'test')
+print(f"args.fold_id: {args.fold_id}")
 
 assert('fold' in df.columns)
 for i in args.fold_id:
@@ -157,7 +164,9 @@ class Embdataset(data.Dataset):
     def __getitem__(self, index):
         emb = torch.tensor(self.features[index].emb, dtype = torch.float32)
         if args.task_type in ['binary', 'regression']:
-            y = torch.tensor(self.features[index].y, dtype = torch.float32)
+            y_value = float(self.features[index].y)  
+            y = torch.tensor(y_value, dtype=torch.float32)
+            # y = torch.tensor(self.features[index].y, dtype = torch.float32)
         else:
             y = torch.tensor(self.features[index].y, dtype = torch.long)
         other_fields = self.features[index].other_fields

@@ -1,4 +1,4 @@
-#!/h/haoran/anaconda3/bin/python
+# !/h/haoran/anaconda3/bin/python
 import sys
 import os
 sys.path.append(os.getcwd())
@@ -10,6 +10,7 @@ import argparse
 import spacy
 import re
 from heuristic_tokenize import sent_tokenize_rules
+from spacy.language import Language
 
 parser = argparse.ArgumentParser("Given a dataframe with a 'text' column, saves a dataframe to file, which is a copy of the input dataframe with 'sents_space' and 'toks' columns added on")
 parser.add_argument("input_loc", help = "pickled dataframe with 'text' column", type=str)
@@ -20,11 +21,13 @@ args = parser.parse_args()
 tokenizer = BertTokenizer.from_pretrained(args.model_path)
 model = BertModel.from_pretrained(args.model_path)
 
-df = pd.read_pickle(args.input_loc)
-
+# df = pd.read_pickle(args.input_loc)
+df = pd.read_csv(args.input_loc)
+print(f"Data loaded: {df['text'].head()} of len: {len(df)} and cols: {df.columns}")
 '''
 Code taken from https://github.com/EmilyAlsentzer/clinicalBERT
 '''
+@Language.component('sbd_component')
 def sbd_component(doc):
     for i, token in enumerate(doc[:-2]):
         # define sentence start if period + titlecase token
@@ -56,7 +59,7 @@ def process_text(sent_text):
 def get_sentences(doc):
     temp = []
     for i in doc.sents:
-        s = process_text(i.string)
+        s = process_text(i.text)
         if s is not None:
             temp.append(s)
     return temp
@@ -147,9 +150,13 @@ def repl(m):
     return replace_deid(label)
 
 nlp = spacy.load('en_core_sci_md', disable=['tagger','ner'])
-nlp.add_pipe(sbd_component, before='parser')
+nlp.add_pipe('sbd_component', before='parser')
+
+df = df[df['text'].apply(lambda x: isinstance(x, str))]
 
 df['sents'], df['sections'] = zip(*df.text.apply(process_note))
+print(f"Finished sentence and section extraction for {len(df)} notes")
+
 df['mod_text'] = df['sections'].apply(lambda x: '\n'.join(x))
 
 tokens = []
@@ -163,6 +170,7 @@ def tokenize_sents(x):
     return [len(tokenizer.tokenize(i)) for i in x]
 
 df['sent_toks_lens'] = df['sents'].apply(lambda x: tokenize_sents(x)) #length of each sent
+print(f"Tokenization complete. First token sequence: {df['toks'].iloc[0][:10]}")
 
 # sentences could be composed of weird characters, that have length >= 1
 # but when tokenized, they are dropped, resulting in empty sentences
@@ -182,3 +190,6 @@ df2 = df.loc[df.sent_toks_lens.apply(lambda x: sum([i == 0 for i in x])) > 0]
 df2.apply(drop_bad_sents, axis = 1) #modifies sentence list in place
 
 df.to_pickle(args.output_loc)
+print(f"After sentence tokenization shape : {df.shape} and size of pkl: {len(df)}")
+# df.to_csv(args.output_loc)
+print("✅ Processing complete")

@@ -42,7 +42,9 @@ model.to(device)
 if n_gpu > 1:
     model = torch.nn.DataParallel(model)
 
-generator = data.DataLoader(MIMICDataset(features, 'train', 'classification'),  shuffle = True,  batch_size = n_gpu*32)
+batch_size = n_gpu * 32 if n_gpu > 0 else 32
+
+generator = data.DataLoader(MIMICDataset(features, 'train', 'classification'),  shuffle = True,  batch_size = batch_size)
 
 EMB_SIZE = get_emb_size(args.emb_method)
 def get_embs(generator):

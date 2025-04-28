@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 import shelve
 
 from random import random, randrange, randint, shuffle, choice
-from pytorch_pretrained_bert.tokenization import BertTokenizer
+from transformers import BertTokenizer
 import numpy as np
 import json
 import collections
@@ -444,7 +444,8 @@ def main():
             df = df[df[args.drop_group] != i]
         print('Records after dropping: %s' %len(df))
 
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    # tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
     vocab_list = list(tokenizer.vocab.keys())
     docs =  DocumentDatabase()
     for idx, row in df.iterrows():
