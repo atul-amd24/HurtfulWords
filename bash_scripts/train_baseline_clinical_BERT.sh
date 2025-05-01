@@ -9,7 +9,7 @@ source activate hurtfulwords
 
 BASE_DIR="/Users/aravind/Premnisha/MS/dlh/HurtfulWords/"
 OUTPUT_DIR="/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/"
-SCIBERT_DIR="/Users/aravind/.cache/huggingface/hub/models--allenai--scibert_scivocab_uncased/snapshots/24f92d32b1bfb0bcaf9ab193ff3ad01e87732fc1"
+SCIBERT_DIR="/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/models/scibert_scivocab_uncased"
 mkdir -p "$OUTPUT_DIR/models/"
 
 cd "$BASE_DIR/scripts" 

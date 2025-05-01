@@ -1,0 +1,48 @@
+**** ADD ****
+male mean,	 0.020582230512281932
+female mean,	 -0.5146479696662851
+Test statistic,	 1000.0
+p-value,	 1.0156343508714168e-13
+
+**** CVD ****
+male mean,	 0.26407810239488355
+female mean,	 -0.3519624772511813
+Test statistic,	 19234.0
+p-value,	 1.4445388377459115e-62
+
+**** DIAB ****
+male mean,	 0.20501384357174318
+female mean,	 -0.8648625595808942
+Test statistic,	 100.0
+p-value,	 2.3610472269361972e-20
+
+**** DNR ****
+male mean,	 -0.6355247114085104
+female mean,	 -1.356592951514442
+Test statistic,	 58.0
+p-value,	 0.00011716582923994501
+
+**** DRUG ****
+male mean,	 -0.07725931089305202
+female mean,	 0.10539200108989834
+Test statistic,	 3006.0
+p-value,	 0.10222225344644482
+
+**** HIV ****
+male mean,	 0.6159614584237104
+female mean,	 -1.247466724157094
+Test statistic,	 2.0
+p-value,	 2.0737159058532836e-21
+
+**** HTN ****
+male mean,	 0.4397972810546324
+female mean,	 -0.4022722058091709
+Test statistic,	 3038.0
+p-value,	 3.0331670625645725e-50
+
+**** MENT ****
+male mean,	 0.084497621768897
+female mean,	 -0.2628114994945611
+Test statistic,	 13566.0
+p-value,	 2.08523202258553e-09
+

@@ -15,7 +15,7 @@ torch.set_grad_enabled(False)
 
 # Attribute list for bias evaluation
 attribute_list = [
-    # ("gender", "Male", "Female"),
+    ("gender", "Male", "Female"),
     ("language_to_use", "English", "Other"),
     ("ethnicity_to_use", "White", "Other"),
     ("ethnicity_to_use", "Black", "Other"),
@@ -116,31 +116,41 @@ def compute_fairness_metrics(preds, trues, label_column, group_value):
     return accuracy, recall, specificity
 
 # Evaluate performance group-wise
-def evaluate_groupwise(preds, trues, df, attribute, group1, group2):
-    group1_mask = df[attribute] == group1
-    group2_mask = df[attribute] == group2
+def evaluate_groupwise(df):
+    results = []
 
-    tp1 = np.sum((preds[group1_mask] == 1) & (trues[group1_mask] == 1))
-    tn1 = np.sum((preds[group1_mask] == 0) & (trues[group1_mask] == 0))
-    fp1 = np.sum((preds[group1_mask] == 1) & (trues[group1_mask] == 0))
-    fn1 = np.sum((preds[group1_mask] == 0) & (trues[group1_mask] == 1))
-    n1 = group1_mask.sum()
+    for attribute, group1, group2 in attribute_list:
+        attr_df = df[df['attribute'] == attribute]
 
-    tp2 = np.sum((preds[group2_mask] == 1) & (trues[group2_mask] == 1))
-    tn2 = np.sum((preds[group2_mask] == 0) & (trues[group2_mask] == 0))
-    fp2 = np.sum((preds[group2_mask] == 1) & (trues[group2_mask] == 0))
-    fn2 = np.sum((preds[group2_mask] == 0) & (trues[group2_mask] == 1))
-    n2 = group2_mask.sum()
+        g1 = attr_df[attr_df['group'] == group1]
+        g2 = attr_df[attr_df['group'] == group2]
 
-    parity_gap = (tp1 + fp1) / n1 - (tp2 + fp2) / n2
-    recall_gap = (tp1 / (tp1 + fn1 + 1e-6)) - (tp2 / (tp2 + fn2 + 1e-6))
-    specificity_gap = (tn1 / (tn1 + fp1 + 1e-6)) - (tn2 / (tn2 + fp2 + 1e-6))
+        if g1.empty or g2.empty:
+            print(f"[WARN] Missing data for {attribute} comparison: {group1} vs {group2}")
+            continue
 
-    return {
-        "parity_gap": parity_gap,
-        "recall_gap": recall_gap,
-        "specificity_gap": specificity_gap
-    }
+        g1 = g1.iloc[0]
+        g2 = g2.iloc[0]
+
+        result = {
+            "attribute": attribute,
+            "group1": group1,
+            "group2": group2,
+            "baseline_parity_gap": g1['baseline_accuracy'] - g2['baseline_accuracy'],
+            "baseline_recall_gap": g1['baseline_recall'] - g2['baseline_recall'],
+            "baseline_specificity_gap": g1['baseline_specificity'] - g2['baseline_specificity'],
+            "adv_parity_gap": g1['adv_accuracy'] - g2['adv_accuracy'],
+            "adv_recall_gap": g1['adv_recall'] - g2['adv_recall'],
+            "adv_specificity_gap": g1['adv_specificity'] - g2['adv_specificity'],
+        }
+
+        print("-------------RESULTS----------------")
+        print(f"{results}")
+        print("--------------------------")
+
+        results.append(result)
+
+    return pd.DataFrame(results)
 
 # Main evaluation
 def full_evaluation():
@@ -179,20 +189,15 @@ def full_evaluation():
             print("-------------RESULTS----------------")
             print(f"{results}")
             print("--------------------------")
-    
-    # Return results
-    df_results = pd.DataFrame(results)
-    print(tabulate(df_results, headers='keys', tablefmt='pretty', showindex=False))
-    return df_results
 
-# Visualization
+# # Visualization
 def plot_gap_improvements(df_results):
-    attributes = df_results['Attribute'] + " (" + df_results['Group1'] + " vs " + df_results['Group2'] + ")"
+    attributes = df_results['attribute'] + " (" + df_results['group1'] + " vs " + df_results['group2'] + ")"
     x = np.arange(len(attributes))
 
-    parity_improvement = df_results['Baseline Parity Gap'] - df_results['Adv Parity Gap']
-    recall_improvement = df_results['Baseline Recall Gap'] - df_results['Adv Recall Gap']
-    specificity_improvement = df_results['Baseline Specificity Gap'] - df_results['Adv Specificity Gap']
+    parity_improvement = df_results['baseline_parity_gap'] - df_results['adv_parity_gap']
+    recall_improvement = df_results['baseline_recall_gap'] - df_results['adv_recall_gap']
+    specificity_improvement = df_results['baseline_specificity_gap'] - df_results['adv_specificity_gap']
 
     width = 0.25
     plt.figure(figsize=(18, 7))
@@ -208,7 +213,22 @@ def plot_gap_improvements(df_results):
     plt.tight_layout()
     plt.show()
 
-# Run everything
 if __name__ == "__main__":
-    df_results = full_evaluation()
-    plot_gap_improvements(df_results)
+    # df_results = full_evaluation()
+    df_results=[{'attribute': 'gender', 'group': 'Male', 'baseline_accuracy': 0.0, 'baseline_recall': 0.0, 'baseline_specificity': 0.0, 'adv_accuracy': 0.9942418426103646, 'adv_recall': 0.0, 'adv_specificity': 0.9942418426103646}, {'attribute': 'gender', 'group': 'Female', 'baseline_accuracy': 0.0, 'baseline_recall': 0.0, 'baseline_specificity': 0.0, 'adv_accuracy': 0.9942418426103646, 'adv_recall': 0.0, 'adv_specificity': 0.9942418426103646},{'attribute': 'language_to_use', 'group': 'English', 'baseline_accuracy': 0.6084452975047985, 'baseline_recall': 0.3907563025210084, 'baseline_specificity': 0.7915194346289752, 'adv_accuracy': 0.5143953934740882, 'adv_recall': 0.21428571428571427, 'adv_specificity': 0.7667844522968198}, {'attribute': 'language_to_use', 'group': 'Other', 'baseline_accuracy': 0.6775431861804223, 'baseline_recall': 0.3181818181818182, 'baseline_specificity': 0.710691823899371, 'adv_accuracy': 0.7332053742802304, 'adv_recall': 0.25, 'adv_specificity': 0.7777777777777778}, {'attribute': 'ethnicity_to_use', 'group': 'White', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Other', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Black', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Other', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Hispanic', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Other', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Asian', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'ethnicity_to_use', 'group': 'Other', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'insurance', 'group': 'Medicare', 'baseline_accuracy': 0.5547024952015355, 'baseline_recall': 0.3412698412698413, 'baseline_specificity': 0.7546468401486989, 'adv_accuracy': 0.5028790786948176, 'adv_recall': 0.21825396825396826, 'adv_specificity': 0.7695167286245354}, {'attribute': 'insurance', 'group': 'Other', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}, {'attribute': 'insurance', 'group': 'Private', 'baseline_accuracy': 0.510556621880998, 'baseline_recall': 0.22162162162162163, 'baseline_specificity': 0.6696428571428571, 'adv_accuracy': 0.581573896353167, 'adv_recall': 0.22702702702702704, 'adv_specificity': 0.7767857142857143}, {'attribute': 'insurance', 'group': 'Other', 'baseline_accuracy': 0.708253358925144, 'baseline_recall': 0.0, 'baseline_specificity': 0.708253358925144, 'adv_accuracy': 0.7754318618042226, 'adv_recall': 0.0, 'adv_specificity': 0.7754318618042226}]
+
+    df_results = pd.DataFrame(df_results)
+    output_path = "/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/fairness_results.csv"
+    df_results.to_csv(output_path, index=False)
+    print(f"[INFO] Fairness metrics results written to '{output_path}'")
+    
+    metric_cols = ['baseline_accuracy', 'baseline_recall', 'baseline_specificity',
+                   'adv_accuracy', 'adv_recall', 'adv_specificity']
+    
+    df_results[metric_cols] = df_results[metric_cols].applymap(lambda x: round(x * 100, 2))
+
+    df_comp = evaluate_groupwise(df_results)
+    output_path_comp = "/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/compared_fairness_results.csv"
+    df_comp.to_csv(output_path_comp, index=False)
+    print(f"[INFO] Compared Fairness metrics results written to '{output_path}'")
+    plot_gap_improvements(df_comp)

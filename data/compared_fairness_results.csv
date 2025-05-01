@@ -1,0 +1,9 @@
+attribute,group1,group2,baseline_parity_gap,baseline_recall_gap,baseline_specificity_gap,adv_parity_gap,adv_recall_gap,adv_specificity_gap
+gender,Male,Female,0.0,0.0,0.0,0.0,0.0,0.0
+language_to_use,English,Other,-0.06909788867562383,0.07257448433919023,0.0808276107296042,-0.2188099808061421,-0.035714285714285726,-0.010993325480957994
+ethnicity_to_use,White,Other,0.0,0.0,0.0,0.0,0.0,0.0
+ethnicity_to_use,Black,Other,0.0,0.0,0.0,0.0,0.0,0.0
+ethnicity_to_use,Hispanic,Other,0.0,0.0,0.0,0.0,0.0,0.0
+ethnicity_to_use,Asian,Other,0.0,0.0,0.0,0.0,0.0,0.0
+insurance,Medicare,Other,-0.1535508637236085,0.3412698412698413,0.04639348122355491,-0.272552783109405,0.21825396825396826,-0.005915133179687282
+insurance,Private,Other,-0.19769673704414592,0.22162162162162163,-0.038610501782286866,-0.1938579654510556,0.22702702702702704,0.0013538524814916686

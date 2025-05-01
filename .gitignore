@@ -1,7 +1,6 @@
 MANIFEST
 build
 dist
-data
 _build
 docs/man/*.gz
 docs/source/api/generated
