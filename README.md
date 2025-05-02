@@ -31,7 +31,14 @@ pip install -r requirements.txt
 
 ## Step 1a: Create sample dataset from MIMIC3 dataset
 - Gain access to MIMIC3 dataset following <>
-- Steps to run <to fill>
+- Steps to run :
+
+python create_sample_data.py \
+ --input_dir /home/adafe/mimic-iii-clinical-database-1.4/mimic-iii-clinical-database-1.4 \
+ --output_dir /home/adafe/mimic-iii-clinical-database-1.4/mimic-iii-clinical-database-1.4/selected \
+ --patient_file PATIENTS.csv \
+ --num_of_patients 3500 \
+ --id_column SUBJECT_ID
 
 ## Step 1b: Data processing
 Reads in the tables from MIMIC and pregenerates data for clinical BERT pretraining. Reads in the cohorts defined by MIMIC-benchmarks and creates tasks for finetuning on downstream targets.
