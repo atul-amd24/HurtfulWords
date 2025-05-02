@@ -29,22 +29,27 @@ conda activate hurtfulwords
 pip install -r requirements.txt
 ```
 
-## Step 1: Data processing
+## Step 1a: Create sample dataset from MIMIC3 dataset
+- Gain access to MIMIC3 dataset following <>
+- Steps to run <to fill>
+
+## Step 1b: Data processing
 Reads in the tables from MIMIC and pregenerates data for clinical BERT pretraining. Reads in the cohorts defined by MIMIC-benchmarks and creates tasks for finetuning on downstream targets.
 - In `bash_scripts/data_processing_pipeline.sh`, update `BASE_DIR`, `OUTPUT_DIR`, `SCIBERT_DIR` and `MIMIC_BENCHMARK_DIR`.
-- In `scripts/get_data.py`, update the database connection credentials on line 13. If your MIMIC-III is not loaded into a database, you will have to update this script accordingly.
-- Run `bash_scripts/data_processing_pipeline.sh`. This script will require at least 50 GB of RAM, 100 GB of disk space in `OUTPUT_DIR`, and will take several days to complete.
+- In `scripts/get_data.py`, update data_dir with directory where sampled data is created from step 1a and output_folder where the pickle file needs to be stored.
+- Run `bash_scripts/data_processing_pipeline.sh`. This creates the test and train set for inhosp_mort, phenotype_all and phenotype_first.
 
 ## Step 2: Training Baseline Clinical BERT
 Pretrains baseline clinical BERT (initialized from SciBERT) for 1 epoch on sequences of length 128, then 1 epoch on sequences of length 512.
 - In `bash_scripts/train_baseline_clinical_BERT.sh`, update `BASE_DIR`, `OUTPUT_DIR`, and `SCIBERT_DIR`. These variables should have the same values as in step 1.
 - Run `bash_scripts/train_baseline_clinical_BERT.sh` on a GPU cluster. The resultant model will be saved in `${OUTPUT_DIR}/models/baseline_clinical_BERT_1_epoch_512/`.
+** Due to resource limitations training the model using CPU took a long time about 24 hours for one epoch. 
 
 ## Step 3: Training Adversarial Clinical BERT
 Pretrains clinical BERT (initialized from SciBERT) with adversarial debiasing using gender as the protected attribute, for 1 epoch on sequences of length 128, then 1 epoch on sequences of length 512. 
 - In `bash_scripts/train_adv_clinical_bert.sh`, update `BASE_DIR`, `OUTPUT_DIR`, and `SCIBERT_DIR`. These variables should have the same values as in step 1.
 - Run `bash_scripts/train_adv_clinical_bert.sh gender` on a GPU cluster. The resultant model will be saved in `${OUTPUT_DIR}/models/adv_clinical_BERT_gender_1_epoch_512/`.
-
+** Due to resource limitations training the model using CPU took a long time about 24 hours for one epoch. 
 
 ## Step 4: Finetuning on Downstream Tasks
 Generates static BERT representations for the downstream tasks created in Step 1. Trains various neural networks (grid searching over hyperparameters) on these tasks.
@@ -53,10 +58,15 @@ Generates static BERT representations for the downstream tasks created in Step 1
 
 ## Step 5: Analyze Downstream Task Results
 Evalutes test-set predictions of the trained models, by generating various fairness metrics.
-- In `bash_scripts/analyze_results.sh`, update `BASE_DIR` and `OUTPUT_DIR`. Run this script, which will output a .xlsx file containing fairness metrics to each of the finetuned model folders.
-- The Jupyter Notebook `notebooks/MergeResults.ipynb` will read in each of the generated metrics files which can then be viewed in the notebook.
+- Download pretrained model suggested above.
+- In `bash_scripts/analyze_results.sh`, update `MODEL_ROOT_DIR`, `INHOSP_MORT_PATH`, `PHENOTYPE_ALL_PATH`, `PHENOTYPE_FIRST_PATH` and `output_path`. Run this script, which will output a .csv file containing fairness metrics for each model.
 
-## Step 6: Log Probabiltiy Bias Scores
+## Step 6: Compute fairness metrics for subgroups
+- Download pretrained model suggested above.
+- Execute `/scripts/fairness_eval.py` update `PHENOTYPE_ALL_PATH`, `BASELINE_MODEL_DIR` and `ADV_MODEL_DIR`. Also update `output_path_comp` and `output_path`. If you would like to run this for inhosp_mort / phenotype_first do necessary changes. 
+- Run the python file, which will output csv for various sub-groups in `attribute_list`.
+
+## Step 7: Log Probabiltiy Bias Scores
 Following procedures in [Kurita et al.](http://arxiv.org/abs/1906.07337), we calculate the 'log probability bias score' to evaluate biases in the BERT model. Template sentences should be in the example format provided by `fill_in_blanks_examples/templates.txt`. A CSV file denoting context key words and the context category should alshould also be suppled (see `fill_in_blanks_examples/attributes.csv`). 
 
 This step can be done independently of steps 4 and 5.
@@ -64,7 +74,7 @@ This step can be done independently of steps 4 and 5.
 - The statistical significance results can be found in `${OUTPUT_DIR}/${MODEL_NAME}_log_scores.tsv`.
 - The notebook `notebooks/GetBasePrevs.ipynb` computes the base prevalences for categories in the notes.
 
-## Step 7: Sentence Completion
+## Step 8: Sentence Completion
 `scripts/predict_missing.py` takes template sentences which contain `_` for tokens to be predicted. Template sentences can be specified directly in the script.
 
 This step can be done independently of steps 1-6.
