@@ -8,10 +8,18 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 
 # Paths
+INHOSP_MORT_PATH = '/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/finetuning/sample/inhosp_mort.pkl'
+PHENOTYPE_FIRST_PATH = '/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/finetuning/sample/phenotype_first.pkl'
 PHENOTYPE_ALL_PATH = '/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/finetuning/sample/phenotype_all.pkl'
 BASELINE_MODEL_DIR = '/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/models/baseline_clinical_BERT_1_epoch_512'
 ADV_MODEL_DIR = '/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/models/adv_clinical_BERT_1_epoch_512'
 torch.set_grad_enabled(False)
+
+DATASETS = {
+    "inhosp_mort": INHOSP_MORT_PATH,
+    "phenotype_first": PHENOTYPE_FIRST_PATH,
+    "phenotype_all": PHENOTYPE_ALL_PATH,
+}
 
 # Attribute list for bias evaluation
 attribute_list = [
@@ -24,9 +32,6 @@ attribute_list = [
     ("insurance", "Medicare", "Other"),
     ("insurance", "Private", "Other"),
 ]
-
-# Load dataset
-phenotype_df = pd.read_pickle(PHENOTYPE_ALL_PATH)
 
 class PhenotypeDataset(Dataset):
     def __init__(self, dataframe, tokenizer, label_column, group_value, max_length=512):
@@ -153,7 +158,7 @@ def evaluate_groupwise(df):
     return pd.DataFrame(results)
 
 # Main evaluation
-def full_evaluation():
+def full_evaluation(df):
     results = []
 
     # Loop through each attribute in the attribute list
@@ -164,10 +169,10 @@ def full_evaluation():
             print(f"  -> Evaluating group: {group_value}")
 
             # Get baseline predictions
-            baseline_preds, trues = get_predictions(baseline_model, baseline_tokenizer, phenotype_df, label_column, group_value)
+            baseline_preds, trues = get_predictions(baseline_model, baseline_tokenizer, df, label_column, group_value)
             
             # Get adversarial model predictions
-            adv_preds, _ = get_predictions(adv_model, adv_tokenizer, phenotype_df, label_column, group_value)
+            adv_preds, _ = get_predictions(adv_model, adv_tokenizer, df, label_column, group_value)
 
             print(f"    Start Computing fairness metrics for {group_value}")
 
@@ -177,6 +182,7 @@ def full_evaluation():
 
             # Store result
             results.append({
+                'dataset': dataset_name, 
                 'attribute': label_column,
                 'group': group_value,
                 'baseline_accuracy': baseline_metrics[0],
@@ -189,6 +195,7 @@ def full_evaluation():
             print("-------------RESULTS----------------")
             print(f"{results}")
             print("--------------------------")
+            return results
 
 # # Visualization
 def plot_gap_improvements(df_results):
@@ -214,19 +221,22 @@ def plot_gap_improvements(df_results):
     plt.show()
 
 if __name__ == "__main__":
-    df_results = full_evaluation()
-    df_results = pd.DataFrame(df_results)
-    output_path = "/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/fairness_results.csv"
-    df_results.to_csv(output_path, index=False)
-    print(f"[INFO] Fairness metrics results written to '{output_path}'")
-    
-    metric_cols = ['baseline_accuracy', 'baseline_recall', 'baseline_specificity',
-                   'adv_accuracy', 'adv_recall', 'adv_specificity']
-    
-    df_results[metric_cols] = df_results[metric_cols].applymap(lambda x: round(x * 100, 2))
+    for dataset_name, path in DATASETS.items():
+        print(f"\n=== Running evaluation on dataset: {dataset_name} ===\n")
+        # Load dataset
+        df = pd.read_pickle(path)
+        df_results = full_evaluation(df)
+        df_results = pd.DataFrame(df_results)
+        output_path = f"/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/fairness_results_{dataset_name}.csv"
+        df_results.to_csv(output_path, index=False)
+        print(f"[INFO] Fairness metrics results written to {output_path}")
+        metric_cols = ['baseline_accuracy', 'baseline_recall', 'baseline_specificity',
+                    'adv_accuracy', 'adv_recall', 'adv_specificity']
+        
+        df_results[metric_cols] = df_results[metric_cols].applymap(lambda x: round(x * 100, 2))
 
-    df_comp = evaluate_groupwise(df_results)
-    output_path_comp = "/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/compared_fairness_results.csv"
-    df_comp.to_csv(output_path_comp, index=False)
-    print(f"[INFO] Compared Fairness metrics results written to '{output_path}'")
+        df_comp = evaluate_groupwise(df_results)
+        output_path_comp = "/Users/aravind/Premnisha/MS/dlh/HurtfulWords/data/compared_fairness_results_{dataset_name}.csv"
+        df_comp.to_csv(output_path_comp, index=False)
+        print(f"[INFO] Compared Fairness metrics results written to '{output_path}'")
     # plot_gap_improvements(df_comp)

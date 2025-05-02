@@ -1,0 +1,17 @@
+dataset,attribute,group,baseline_accuracy,baseline_recall,baseline_specificity,adv_accuracy,adv_recall,adv_specificity
+phenotype_first,gender,Male,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,gender,Female,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,language_to_use,English,0.5212765957446809,0.014598540145985401,1.0,0.4858156028368794,1.0,0.0
+phenotype_first,language_to_use,Other,0.9361702127659575,0.0,0.9924812030075187,0.05673758865248227,1.0,0.0
+phenotype_first,ethnicity_to_use,White,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Other,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Black,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Other,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Hispanic,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Other,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Asian,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,ethnicity_to_use,Other,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,insurance,Medicare,0.5567375886524822,0.015748031496062992,1.0,0.450354609929078,1.0,0.0
+phenotype_first,insurance,Other,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
+phenotype_first,insurance,Private,0.5851063829787234,0.0,0.9880239520958084,0.4078014184397163,1.0,0.0
+phenotype_first,insurance,Other,0.9929078014184397,0.0,0.9929078014184397,0.0,0.0,0.0
